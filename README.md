@@ -6,6 +6,7 @@ SWD Programmer for PSoc4 based devices.
 To build the programmer you would need a basic FX2LP device. One from amazon or ebay based on CY7C68013A would do. Install the FX2LP SDK from Cypress and flash swd.iic from the FX2LP folder on the FX2LP device.
 
 Connct:
+<code>
  FX2LP
  Device     Target
  PD0        SWDIO
@@ -13,6 +14,7 @@ Connct:
  PB2        XRES (or RESET)
  GND        GND
  3.3V       VCC
+</code>
 
 This will power the target as 3.3V from the FX2LP board. Pleas make sure there is no other power connected to the target as the FX2LP device is not 5V tollerant.
 
