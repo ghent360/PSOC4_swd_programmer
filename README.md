@@ -7,12 +7,12 @@ To build the programmer you would need a basic FX2LP device. One from amazon or 
 
 Connct:
 <p> FX2LP
-<p> Device     Target
-<p> PD0        SWDIO
-<p> PD1        SWDCL
-<p> PB2        XRES (or RESET)
-<p> GND        GND
-<p> 3.3V       VCC
+<p> Device ---> Target
+<p> PD0    ---> SWDIO
+<p> PD1    ---> SWDCL
+<p> PB2    ---> XRES (or RESET)
+<p> GND    ---> GND
+<p> 3.3V   ---> VCC
 
 This will power the target as 3.3V from the FX2LP board. Pleas make sure there is no other power connected to the target as the FX2LP device is not 5V tollerant.
 
