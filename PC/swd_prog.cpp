@@ -16,14 +16,16 @@
 #define FLASH_ROW_BYTE_SIZE_HEX_FILE         128
 #define FLASH_PROTECTION_BYTE_SIZE_HEX_FILE  32
 
-static CCyUSBDevice USBDevice;
-static CCyControlEndPoint *ept = USBDevice.ControlEndPt;
-
-BYTE swd_PacketAck;
-BYTE swd_PacketData[4];
-
+static CCyUSBDevice gUSBDevice;
+BYTE gSWD_PacketAck;
+static BYTE gSWD_PacketData[4];
+static HexFileParser gHexParser;
+static bool gProgram = false;
+static bool gProgramProtection = false;
 static BYTE RM_FetchStatus()
 {
+  CCyControlEndPoint *ept = gUSBDevice.ControlEndPt;
+
 	ept->Target = TGT_DEVICE;
 	ept->ReqType = REQ_VENDOR;
 	ept->Direction = DIR_FROM_DEVICE;
@@ -38,16 +40,18 @@ static BYTE RM_FetchStatus()
   {
     return -1;
   }
-  swd_PacketAck = buf[0];
-  swd_PacketData[0] = buf[1];
-  swd_PacketData[1] = buf[2];
-  swd_PacketData[2] = buf[3];
-  swd_PacketData[3] = buf[4];
+  gSWD_PacketAck = buf[0];
+  gSWD_PacketData[0] = buf[1];
+  gSWD_PacketData[1] = buf[2];
+  gSWD_PacketData[2] = buf[3];
+  gSWD_PacketData[3] = buf[4];
   return 0;
 }
 
 static BYTE RM_WriteIO(DWORD a, DWORD d)
 {
+  CCyControlEndPoint *ept = gUSBDevice.ControlEndPt;
+
 	ept->Target = TGT_DEVICE;
 	ept->ReqType = REQ_VENDOR;
 	ept->Direction = DIR_TO_DEVICE;
@@ -71,6 +75,8 @@ static BYTE RM_WriteIO(DWORD a, DWORD d)
 
 static BYTE RM_ReadIO(DWORD a)
 {
+  CCyControlEndPoint *ept = gUSBDevice.ControlEndPt;
+
 	ept->Target = TGT_DEVICE;
 	ept->ReqType = REQ_VENDOR;
 	ept->Direction = DIR_TO_DEVICE;
@@ -91,6 +97,8 @@ static BYTE RM_ReadIO(DWORD a)
 static BYTE RM_ReadFunc(BYTE fnCode)
 {
   BYTE result;
+  CCyControlEndPoint *ept = gUSBDevice.ControlEndPt;
+
 	ept->Target = TGT_DEVICE;
 	ept->ReqType = REQ_VENDOR;
 	ept->Direction = DIR_FROM_DEVICE;
@@ -106,11 +114,11 @@ static BYTE RM_ReadFunc(BYTE fnCode)
     return -1;
   }
   result = buf[0];
-  swd_PacketAck = buf[1];
-  swd_PacketData[0] = buf[2];
-  swd_PacketData[1] = buf[3];
-  swd_PacketData[2] = buf[4];
-  swd_PacketData[3] = buf[5];
+  gSWD_PacketAck = buf[1];
+  gSWD_PacketData[0] = buf[2];
+  gSWD_PacketData[1] = buf[3];
+  gSWD_PacketData[2] = buf[4];
+  gSWD_PacketData[3] = buf[5];
   return result;
 }
 
@@ -137,21 +145,17 @@ void Write_IO(unsigned long addr_32, unsigned long data_32)
 void Read_IO(unsigned long addr_32, unsigned long *data_32)
 {
   RM_ReadIO(addr_32);
-  *data_32 = (((unsigned long)swd_PacketData[3] << 24) | 
-              ((unsigned long)swd_PacketData[2] << 16) | 
-              ((unsigned long)swd_PacketData[1] << 8) | 
-              ((unsigned long)swd_PacketData[0]));
+  *data_32 = (((unsigned long)gSWD_PacketData[3] << 24) | 
+              ((unsigned long)gSWD_PacketData[2] << 16) | 
+              ((unsigned long)gSWD_PacketData[1] << 8) | 
+              ((unsigned long)gSWD_PacketData[0]));
 }
-
-void ExitProgrammingMode();
-
-HexFileParser hexParser;
 
 void HEX_ReadSiliconId(unsigned long *hexSiliconId)
 {
   unsigned char i;
   unsigned char metadata[12];
-  hexParser.getDataFrom(0x90500000, sizeof(metadata), metadata);
+  gHexParser.getDataFrom(0x90500000, sizeof(metadata), metadata);
 
   for(i = 0; i < 4; i++)
   {
@@ -161,29 +165,30 @@ void HEX_ReadSiliconId(unsigned long *hexSiliconId)
 
 void HEX_ReadRowData(unsigned short rowCount, unsigned char * rowData)
 {
-  hexParser.getDataFrom(rowCount * FLASH_ROW_BYTE_SIZE_HEX_FILE, 
+  gHexParser.getDataFrom(rowCount * FLASH_ROW_BYTE_SIZE_HEX_FILE, 
     FLASH_ROW_BYTE_SIZE_HEX_FILE, rowData);
 }
 
 void HEX_ReadChipProtectionData(unsigned char * chipProtectionData)
 {
-  hexParser.getDataFrom(0x90600000, 1, chipProtectionData);
+  gHexParser.getDataFrom(0x90600000, 1, chipProtectionData);
 }
 
 void HEX_ReadRowProtectionData(unsigned char rowProtectionByteSize, unsigned char * rowProtectionData)
 {
-  hexParser.getDataFrom(0x90400000, rowProtectionByteSize, rowProtectionData);
+  gHexParser.getDataFrom(0x90400000, rowProtectionByteSize, rowProtectionData);
 }
 
 void HEX_ReadChecksumData(unsigned short * checksumData)
 {
   unsigned char data[2];
-  hexParser.getDataFrom(0x90300000, 2, data);
+  gHexParser.getDataFrom(0x90300000, 2, data);
   *checksumData = ((unsigned short)data[0] << 8) | (data[1]);
 }
 
 void ProgramDevice(void)
 {
+  unsigned char status;
   printf("Acquring device...");
   if(DeviceAcquire() != SUCCESS)
   {
@@ -194,50 +199,64 @@ void ProgramDevice(void)
   printf("done\nVerifying chip ID...");
   if(VerifySiliconId() != SUCCESS)    
   {
+    unsigned long hexSiliconId;
     printf("error.\n");
+    HEX_ReadSiliconId(&hexSiliconId);
+    printf("Device reports silicon ID:%08x, but the file was compiled for %08x\n",
+      GetSiliconId(), hexSiliconId);
     return;
   }
 
-  printf("done\nErasing flash...");
-  if(EraseAllFlash() != SUCCESS)             
+  if (gProgram)
   {
-    printf("error.\n");
-    return;
-  }
+    printf("done\nErasing flash...");
+    if(EraseAllFlash() != SUCCESS)             
+    {
+      printf("error.\n");
+      return;
+    }
 
-  printf("done\nChecking flash checksum...");
-  if(ChecksumPrivileged() != SUCCESS)                    
-  {
-    printf("error.\n");
-    return;
-  }
+    printf("done\nChecking flash checksum...");
+    if(ChecksumPrivileged() != SUCCESS)                    
+    {
+      printf("error.\n");
+      return;
+    }
 
-  printf("done\nProgramming...");
-  if(ProgramFlash() != SUCCESS)          
-  {
-    printf("error.\n");
-    return;
+    printf("done\nProgramming...");
+    if(ProgramFlash() != SUCCESS)          
+    {
+      printf("error.\n");
+      return;
+    }
   }
 
   printf("done\nVerifying...");
-  if(VerifyFlash() != SUCCESS)       
+  status = VerifyFlash();
+  if(status != SUCCESS)       
   {
     printf("error.\n");
+    if (status >= 2)
+    {
+      PrintFlashVerificationError(status - 2);
+    }
     return;
   }
 
-  printf("done\nProgramming sector protection...");
-  if(ProgramProtectionSettings() != SUCCESS) 
+  if (gProgramProtection)
   {
-    printf("error.\n");
-    return;
-  }
-
-  printf("done\nVerifying sector protection...");
-  if(VerifyProtectionSettings() != SUCCESS)
-  {
-    printf("error.\n");
-    return;
+    printf("done\nProgramming sector protection...");
+    if(ProgramProtectionSettings() != SUCCESS) 
+    {
+      printf("error.\n");
+      return;
+    }
+    printf("done\nVerifying sector protection...");
+    if(VerifyProtectionSettings() != SUCCESS)
+    {
+      printf("error.\n");
+      return;
+    }
   }
 
   printf("done\nVerifying final checksum...");
@@ -250,25 +269,79 @@ void ProgramDevice(void)
   printf("done\nSUCCESS\n");
 }
 
+void printUsage()
+{
+    printf("Usage: swd_prog [-y] [-yp] <hex file name>\n");
+    printf("    by default it would perform only verification of the flash content.\n\n");
+    printf("    specify -y to perform programming of the flash (WARNING: this \n"
+           "    operation will erase all flash content, existing programming would be\n"
+           "    lost)\n\n");
+    printf("    add -yy to program the flash security settings. By default all flash \n"
+           "    protection is off and anyone can read the flash content. You can set \n"
+           "    flash protection bits, to secure some or all content. Use with caution\n"
+           "    as you may render the SWD port unusable if you set the 'KILL' bit by \n"
+           "    mistake.\n");
+}
+
 int main(int argc, char* argv[])
 {
-  if (argc != 2)
+  int fileIdx = -1;
+  if (argc < 2)
   {
-    printf("Usage: swd_prog <hex file name>\n");
+    printUsage();
     return 1;
   }
-  if (!hexParser.parse(argv[1]))
+  for (int idx = 1; idx < argc; idx++)
   {
-    printf("Error persing the input file.\n");
+    if (argv[idx][0] == '-')
+    {
+      if (argv[idx][1] == 'y')
+      {
+        if (argv[idx][2] == 0)
+        {
+          gProgram = true;
+        }
+        else if (argv[idx][3] == 'p')
+        {
+          gProgramProtection = true;
+        }
+        else
+        {
+          printf("Unknow argument %s\n", argv[idx]);
+          printUsage();
+          return 2;
+        }
+      }
+      else
+      {
+        printf("Unknow argument %s\n", argv[idx]);
+        printUsage();
+        return 2;
+      }
+    }
+    else
+    {
+      fileIdx = idx;
+    }
+  }
+  if (fileIdx < 0)
+  {
+    printf("Please specify input file name.\n");
+    printUsage();
+    return 2;
+  }
+  if (!gHexParser.parse(argv[fileIdx]))
+  {
+    printf("Error persing the input file: %s.\n", argv[fileIdx]);
     return -1;
   }
 
-  if (!USBDevice.IsOpen()) {
-    printf("Can't connect to the FX2LP USB device. Check the cable.\n");
+  if (!gUSBDevice.IsOpen()) {
+    printf("Can't connect to the FX2LP USB device. Check the USB cable.\n");
     return -1;
   }
   ProgramDevice();
   ExitProgrammingMode();
-  USBDevice.Close();
+  gUSBDevice.Close();
 	return 0;
 }

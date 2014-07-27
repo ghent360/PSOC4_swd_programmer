@@ -59,17 +59,20 @@
 #include "DataFetch.h"
 #include "Timeout.h"
 
-extern BYTE swd_PacketAck;
-extern BYTE swd_PacketData[4];
+extern BYTE gSWD_PacketAck;
 
 /******************************************************************************
 *   Global Variable definitions
 ******************************************************************************/
-static unsigned long checksum_Privileged 		= 0;
-static unsigned long statusCode 				= 0;
+static unsigned long checksum_Privileged 		  = 0;
+static unsigned long statusCode 			      	= 0;
 
-static unsigned char result 					= 0;
+static unsigned char result 				        	= 0;
 static unsigned char chipProtectionData_Chip	= 0;
+static unsigned long deviceSiliconID          = 0;
+static unsigned char rowData[FLASH_ROW_BYTE_SIZE_HEX_FILE];
+static unsigned char chipData[FLASH_ROW_BYTE_SIZE_HEX_FILE];
+static unsigned short gRowCount;
 
 enum Transition_mode
 {
@@ -100,7 +103,7 @@ unsigned short GetFlashRowCount()
 *
 * Note:
 * This function is called from main.c when SROM_TIMEOUT_ERROR bit is set in the
-* swd_PacketAck. 
+* gSWD_PacketAck. 
 *
 ******************************************************************************/
 unsigned char ReadSromStatus(void)
@@ -140,14 +143,14 @@ unsigned char GetChipProtectionVal(void)
 
   /* Write the command to CPUSS_SYSARG register */
   Write_IO (CPUSS_SYSARG, parameter1);
-  if( swd_PacketAck != SWD_OK_ACK )
+  if( gSWD_PacketAck != SWD_OK_ACK )
   {
     return 1;
   }
 
   /* Request system call by writing to CPUSS_SYSREQ register */
   Write_IO (CPUSS_SYSREQ, SROM_SYSREQ_BIT | SROM_CMD_GET_SILICON_ID);
-  if( swd_PacketAck != SWD_OK_ACK )
+  if( gSWD_PacketAck != SWD_OK_ACK )
   {
     return 2;
   }
@@ -162,7 +165,7 @@ unsigned char GetChipProtectionVal(void)
   /* Read CPUSS_SYSREQ register to get the current protection setting of the
   chip */
   Read_IO( CPUSS_SYSREQ, &chipProtData);
-  if( swd_PacketAck != SWD_OK_ACK )
+  if( gSWD_PacketAck != SWD_OK_ACK )
   {
     return 4;
   }
@@ -244,7 +247,7 @@ unsigned char GetTransitionMode(void)
   error */
   if (flow == WRONG_TRANSITION)
   {
-    swd_PacketAck = swd_PacketAck | TRANSITION_ERROR;
+    gSWD_PacketAck = gSWD_PacketAck | TRANSITION_ERROR;
     return 1;
   }
   return SUCCESS;
@@ -291,14 +294,14 @@ unsigned char LoadLatch(unsigned char arrayID, unsigned char * rowData)
 
   /* Write parameter1 in SRAM */
   Write_IO(SRAM_PARAMS_BASE + 0x00, parameter1);
-  if( swd_PacketAck != SWD_OK_ACK )
+  if( gSWD_PacketAck != SWD_OK_ACK )
   {
     return 1;
   }
 
   /* Write parameter2 in SRAM */
   Write_IO(SRAM_PARAMS_BASE + 0x04, parameter2);
-  if( swd_PacketAck != SWD_OK_ACK )
+  if( gSWD_PacketAck != SWD_OK_ACK )
   {
     return 2;
   }
@@ -310,7 +313,7 @@ unsigned char LoadLatch(unsigned char arrayID, unsigned char * rowData)
 
     /* Write parameter1 in SRAM */
     Write_IO(SRAM_PARAMS_BASE + 0x08 + i, parameter1);
-    if( swd_PacketAck != SWD_OK_ACK )
+    if( gSWD_PacketAck != SWD_OK_ACK )
     {
       return 3;
     }
@@ -320,14 +323,14 @@ unsigned char LoadLatch(unsigned char arrayID, unsigned char * rowData)
 
   /* Set location of parameters */
   Write_IO(CPUSS_SYSARG, SRAM_PARAMS_BASE);
-  if( swd_PacketAck != SWD_OK_ACK )
+  if( gSWD_PacketAck != SWD_OK_ACK )
   {
     return 4;
   }
 
   /* Request SROM operation */
   Write_IO(CPUSS_SYSREQ, SROM_SYSREQ_BIT | SROM_CMD_LOAD_LATCH);
-  if( swd_PacketAck != SWD_OK_ACK )
+  if( gSWD_PacketAck != SWD_OK_ACK )
   {
     return 5;
   }
@@ -385,14 +388,14 @@ unsigned char ChecksumAPI(unsigned short checksumRow, unsigned long *checksum)
 
   /* Load CPUSS_SYSARG register with parameter1 command */
   Write_IO (CPUSS_SYSARG, parameter1);
-  if( swd_PacketAck != SWD_OK_ACK )
+  if( gSWD_PacketAck != SWD_OK_ACK )
   {
     return 1;
   }
 
   /* Request SROM operation */
   Write_IO (CPUSS_SYSREQ, SROM_SYSREQ_BIT | SROM_CMD_CHECKSUM);
-  if( swd_PacketAck != SWD_OK_ACK )
+  if( gSWD_PacketAck != SWD_OK_ACK )
   {
     return 2;
   }
@@ -406,7 +409,7 @@ unsigned char ChecksumAPI(unsigned short checksumRow, unsigned long *checksum)
 
   /* Read CPUSS_SYSARG register to get the checksum value */
   Read_IO( CPUSS_SYSARG, &checksum_chip);
-  if( swd_PacketAck != SWD_OK_ACK )
+  if( gSWD_PacketAck != SWD_OK_ACK )
   {
     return 4;
   }
@@ -439,8 +442,6 @@ unsigned char ChecksumAPI(unsigned short checksumRow, unsigned long *checksum)
 ******************************************************************************/
 unsigned char VerifySiliconId(void)
 {
-  unsigned char i;
-  unsigned long deviceSiliconID;
   unsigned long hexSiliconId = 0;
 
   unsigned long parameter1 	 = 0;
@@ -457,14 +458,14 @@ unsigned char VerifySiliconId(void)
 
   /* Load CPUSS_SYSARG register with parameter1 */
   Write_IO (CPUSS_SYSARG, parameter1);
-  if( swd_PacketAck != SWD_OK_ACK )
+  if( gSWD_PacketAck != SWD_OK_ACK )
   {
     return 1;
   }
 
   /* Request SROM operation */
   Write_IO (CPUSS_SYSREQ, SROM_SYSREQ_BIT | SROM_CMD_GET_SILICON_ID);
-  if( swd_PacketAck != SWD_OK_ACK )
+  if( gSWD_PacketAck != SWD_OK_ACK )
   {
     return 2;
   }
@@ -478,13 +479,13 @@ unsigned char VerifySiliconId(void)
 
   /* Read CPUSS_SYSARG and CPUSS_SYSREQ to read 4 bytes of silicon ID */
   Read_IO(CPUSS_SYSARG, &siliconIdData1);
-  if( swd_PacketAck != SWD_OK_ACK )
+  if( gSWD_PacketAck != SWD_OK_ACK )
   {
     return 4;
   }
 
   Read_IO(CPUSS_SYSREQ, &siliconIdData2);
-  if( swd_PacketAck != SWD_OK_ACK )
+  if( gSWD_PacketAck != SWD_OK_ACK )
   {
     return 5;
   }
@@ -498,17 +499,18 @@ unsigned char VerifySiliconId(void)
   deviceSiliconID = (((siliconIdData2 << 24) & 0xFF000000) + (siliconIdData1 & 0x00FF0000) + //
     ((siliconIdData1 << 8) & 0x0000FF00) + ((siliconIdData1 >> 8) & 0x000000FF));
 
-  /* Match the Silicon ID read from HEX file and PSoC 4 chip */
-  for (i=0; i<SILICON_ID_BYTE_LENGTH; i++)
+  if ((deviceSiliconID & 0xFF00FFFF) != (hexSiliconId & 0xFF00FFFF))
   {
-    if ((deviceSiliconID & 0xFF00FFFF) != (hexSiliconId & 0xFF00FFFF))
-    {
-      /* Set the VERIFICATION_ERROR bit in swd_PacketAck */
-      swd_PacketAck = swd_PacketAck | VERIFICATION_ERROR;
-      return 6;
-    }
+    /* Set the VERIFICATION_ERROR bit in gSWD_PacketAck */
+    gSWD_PacketAck = gSWD_PacketAck | VERIFICATION_ERROR;
+    return 6;
   }
   return (SUCCESS);
+}
+
+unsigned long GetSiliconId()
+{
+  return deviceSiliconID;
 }
 
 /******************************************************************************
@@ -556,21 +558,21 @@ unsigned char EraseAllFlash(void)
 
     /* Load ERASE_ALL SROM command in parameter1 to SRAM */ 
     Write_IO (SRAM_PARAMS_BASE + 0x00, parameter1);
-    if( swd_PacketAck != SWD_OK_ACK )
+    if( gSWD_PacketAck != SWD_OK_ACK )
     {
       return 2;
     }
 
     /* Set location of parameters */
     Write_IO (CPUSS_SYSARG, SRAM_PARAMS_BASE);
-    if( swd_PacketAck != SWD_OK_ACK )
+    if( gSWD_PacketAck != SWD_OK_ACK )
     {
       return 3;
     }
 
     /* Request SROM call */
     Write_IO (CPUSS_SYSREQ, SROM_SYSREQ_BIT | SROM_CMD_ERASE_ALL);
-    if( swd_PacketAck != SWD_OK_ACK )
+    if( gSWD_PacketAck != SWD_OK_ACK )
     {
       return 4;
     }
@@ -595,14 +597,14 @@ unsigned char EraseAllFlash(void)
 
     /* Load the write protection command to SRAM */
     Write_IO (CPUSS_SYSARG, parameter1);
-    if( swd_PacketAck != SWD_OK_ACK )
+    if( gSWD_PacketAck != SWD_OK_ACK )
     {
       return 6;
     }
 
     /* Request SROM call */
     Write_IO (CPUSS_SYSREQ, SROM_SYSREQ_BIT | SROM_CMD_WRITE_PROTECTION);
-    if( swd_PacketAck != SWD_OK_ACK )
+    if( gSWD_PacketAck != SWD_OK_ACK )
     {
       return 7;
     }
@@ -684,7 +686,6 @@ unsigned char ChecksumPrivileged()
 unsigned char ProgramFlash(void)
 {
   unsigned char arrayID			= 0;
-  unsigned char rowData[FLASH_ROW_BYTE_SIZE_HEX_FILE];
 
   unsigned short numOfFlashRows 	= 0;
   unsigned short rowCount			= 0;
@@ -715,21 +716,21 @@ unsigned char ProgramFlash(void)
 
     /* Write parameters in SRAM */
     Write_IO(SRAM_PARAMS_BASE+0x00, parameter1);
-    if( swd_PacketAck != SWD_OK_ACK )
+    if( gSWD_PacketAck != SWD_OK_ACK )
     {
       return 2;
     }
 
     /* Set location of parameters */
     Write_IO(CPUSS_SYSARG, SRAM_PARAMS_BASE);
-    if( swd_PacketAck != SWD_OK_ACK )
+    if( gSWD_PacketAck != SWD_OK_ACK )
     {
       return 3;
     }
 
     /* Request SROM operation */
     Write_IO(CPUSS_SYSREQ, SROM_SYSREQ_BIT | SROM_CMD_PROGRAM_ROW);
-    if( swd_PacketAck != SWD_OK_ACK )
+    if( gSWD_PacketAck != SWD_OK_ACK )
     {
       return 4;
     }
@@ -773,8 +774,6 @@ unsigned char VerifyFlash(void)
   unsigned short rowAddress 		= 0;
   unsigned short rowCount;
   unsigned char  i;
-  unsigned char  rowData[FLASH_ROW_BYTE_SIZE_HEX_FILE];
-  unsigned char  chipData[FLASH_ROW_BYTE_SIZE_HEX_FILE];
 
   /* Get the total number of flash rows in the Target PSoC 4 device */
   numOfFlashRows   = GetFlashRowCount();
@@ -796,7 +795,7 @@ unsigned char VerifyFlash(void)
     {
       /* Read flash via AHB-interface */
       Read_IO( rowAddress + i, &flashData);
-      if( swd_PacketAck != SWD_OK_ACK )
+      if( gSWD_PacketAck != SWD_OK_ACK )
       {
         return 1;
       }
@@ -812,12 +811,20 @@ unsigned char VerifyFlash(void)
     {
       if (chipData[i] != rowData[i])
       {
-        swd_PacketAck = swd_PacketAck | VERIFICATION_ERROR;
-        return 2;
+        gSWD_PacketAck = gSWD_PacketAck | VERIFICATION_ERROR;
+        gRowCount = rowCount;
+        return 2 + i;
       }
     }
   }
   return SUCCESS;
+}
+
+void PrintFlashVerificationError(int i)
+{
+  printf("Flash verification error at address %08x expected value %02x got %02x\n\n",
+    FLASH_ROW_BYTE_SIZE_HEX_FILE * gRowCount + i, rowData[i], chipData[i]);
+
 }
 
 /******************************************************************************
@@ -881,7 +888,7 @@ unsigned char ProgramProtectionSettings(void)
   /* Load parameter1 in CPUSS_SYSARG register */
   Write_IO(CPUSS_SYSARG, parameter1);	                                            
 
-  if( swd_PacketAck != SWD_OK_ACK )
+  if( gSWD_PacketAck != SWD_OK_ACK )
   {
     return 2;
   }
@@ -889,7 +896,7 @@ unsigned char ProgramProtectionSettings(void)
   /* Request SROM call */
   Write_IO(CPUSS_SYSREQ, SROM_SYSREQ_BIT | SROM_CMD_WRITE_PROTECTION);
 
-  if( swd_PacketAck != SWD_OK_ACK )
+  if( gSWD_PacketAck != SWD_OK_ACK )
   {
     return 3;
   }
@@ -951,7 +958,7 @@ unsigned char VerifyProtectionSettings(void)
   {
     Read_IO(flashProtectionAddress + i, &protectionData);
 
-    if( swd_PacketAck != SWD_OK_ACK )
+    if( gSWD_PacketAck != SWD_OK_ACK )
     {
       return 1;
     }
@@ -969,7 +976,7 @@ unsigned char VerifyProtectionSettings(void)
     {
       /* Set the verification error bit for Flash protection data
       mismatch and return failure */
-      swd_PacketAck = swd_PacketAck | VERIFICATION_ERROR; 
+      gSWD_PacketAck = gSWD_PacketAck | VERIFICATION_ERROR; 
       return 2;
     }
   }
@@ -979,7 +986,7 @@ unsigned char VerifyProtectionSettings(void)
 
   /* Read Chip Level Protection from the silicon */
   Read_IO(SFLASH_CPUSS_PROTECTION, &protectionData);
-  if( swd_PacketAck != SWD_OK_ACK )
+  if( gSWD_PacketAck != SWD_OK_ACK )
   {
     return 3;
   }
@@ -1000,7 +1007,7 @@ unsigned char VerifyProtectionSettings(void)
   {
     /* Set the verification error bit for Flash protection data
     mismatch and return failure */
-    swd_PacketAck = swd_PacketAck | VERIFICATION_ERROR; 
+    gSWD_PacketAck = gSWD_PacketAck | VERIFICATION_ERROR; 
     return 4;
   }
 
@@ -1050,7 +1057,7 @@ unsigned char VerifyChecksum(void)
   /* Compare the checksum data of silicon and hex file */
   if (chip_Checksum != checksumData)
   {
-    swd_PacketAck = swd_PacketAck | VERIFICATION_ERROR;
+    gSWD_PacketAck = gSWD_PacketAck | VERIFICATION_ERROR;
     return 2;
   }
 
@@ -1069,7 +1076,7 @@ unsigned char VerifyChecksum(void)
 *  None.
 *
 * Return:
-*  swd_PacketAck - Each bit of this 8-bit return value has a specific meaning.
+*  gSWD_PacketAck - Each bit of this 8-bit return value has a specific meaning.
 *
 * Note:
 *  Refer to the application note pdf for details on the Error status bit
@@ -1077,7 +1084,7 @@ unsigned char VerifyChecksum(void)
 ******************************************************************************/
 unsigned char ReadHsspErrorStatus()
 {
-  return(swd_PacketAck);
+  return(gSWD_PacketAck);
 }
 
 /* [] END OF FILE */

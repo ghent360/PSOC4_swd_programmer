@@ -136,6 +136,8 @@ void ExitProgrammingMode(void);
 unsigned char ReadHsspErrorStatus(void);
 unsigned char ReadSromStatus(void);
 unsigned char PollSromStatus(void);
+unsigned long GetSiliconId();
+void PrintFlashVerificationError(int i);
 
 #endif /* __PROGRAMMINGSTEPS_H */
 
