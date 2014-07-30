@@ -82,11 +82,6 @@ enum Transition_mode
   WRONG_TRANSITION
 } flow;
 
-unsigned short GetFlashRowCount()
-{
-    return(NUMBER_OF_FLASH_ROWS_HEX_FILE);
-}
-
 /******************************************************************************
 * Function Name: ReadSromStatus
 *******************************************************************************

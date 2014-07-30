@@ -45,7 +45,6 @@
 /******************************************************************************
 *   Macro definitions
 ******************************************************************************/
-#define NUMBER_OF_FLASH_ROWS_HEX_FILE        256
 
 /* The below definitions are not dependent on hex file and are always 
    constant */

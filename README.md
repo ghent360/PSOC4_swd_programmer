@@ -19,8 +19,8 @@ This will power the target as 3.3V from the FX2LP board. Pleas make sure there i
 Use the PC software to flash a .hex file to the target.
 
 Limitations:
-  -- only tested on PSoc 4100 (4200 should work YMMV)
-  -- only tested on 32K flash device. For 16K you may need to modify the PC software.
+  -- only tested on PSoc 4100 and 4200 (I don't have 4000 device)
+  -- only tested on 32K flash device (16K devices should work but YMMV).
 
 Building the software:
 

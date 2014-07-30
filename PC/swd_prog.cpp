@@ -3,6 +3,7 @@
 
 #include "stdafx.h"
 #include "ProgrammingSteps.h"
+#include "DataFetch.h"
 #include <stdio.h>
 
 #define VC_DEVICE_ACQ          0xa1
@@ -12,16 +13,14 @@
 #define VC_WRITE_IO            0xa5
 #define VC_READ_IO             0xa6
 
-#define NUMBER_OF_FLASH_ROWS_HEX_FILE        256
-#define FLASH_ROW_BYTE_SIZE_HEX_FILE         128
-#define FLASH_PROTECTION_BYTE_SIZE_HEX_FILE  32
-
 static CCyUSBDevice gUSBDevice;
 BYTE gSWD_PacketAck;
 static BYTE gSWD_PacketData[4];
 static HexFileParser gHexParser;
 static bool gProgram = false;
 static bool gProgramProtection = false;
+static bool gProg16k = false;
+
 static BYTE RM_FetchStatus()
 {
   CCyControlEndPoint *ept = gUSBDevice.ControlEndPt;
@@ -186,21 +185,28 @@ void HEX_ReadChecksumData(unsigned short * checksumData)
   *checksumData = ((unsigned short)data[0] << 8) | (data[1]);
 }
 
+unsigned short GetFlashRowCount()
+{
+    return gProg16k ? 128 : 256;
+}
+
 void ProgramDevice(void)
 {
   unsigned char status;
   printf("Acquring device...");
-  if(DeviceAcquire() != SUCCESS)
+  status = DeviceAcquire();
+  if (status != SUCCESS)
   {
-    printf("error.\n");
+    printf("error code %d.\n", status);
     return;
   }
 
   printf("done\nVerifying chip ID...");
-  if(VerifySiliconId() != SUCCESS)    
+  status = VerifySiliconId();
+  if (status != SUCCESS)
   {
     unsigned long hexSiliconId;
-    printf("error.\n");
+    printf("error code %d.\n", status);
     HEX_ReadSiliconId(&hexSiliconId);
     printf("Device reports silicon ID:%08x, but the file was compiled for %08x\n",
       GetSiliconId(), hexSiliconId);
@@ -210,32 +216,35 @@ void ProgramDevice(void)
   if (gProgram)
   {
     printf("done\nErasing flash...");
-    if(EraseAllFlash() != SUCCESS)             
+    status = EraseAllFlash();
+    if (status != SUCCESS)
     {
-      printf("error.\n");
+      printf("error code %d.\n", status);
       return;
     }
 
     printf("done\nChecking flash checksum...");
-    if(ChecksumPrivileged() != SUCCESS)                    
+    status = ChecksumPrivileged();
+    if (status != SUCCESS)
     {
-      printf("error.\n");
+      printf("error code %d.\n", status);
       return;
     }
 
     printf("done\nProgramming...");
-    if(ProgramFlash() != SUCCESS)          
+    status = ProgramFlash();
+    if (status != SUCCESS)
     {
-      printf("error.\n");
+      printf("error code %d.\n", status);
       return;
     }
   }
 
   printf("done\nVerifying...");
   status = VerifyFlash();
-  if(status != SUCCESS)       
+  if (status != SUCCESS)
   {
-    printf("error.\n");
+    printf("error code %d.\n", status);
     if (status >= 2)
     {
       PrintFlashVerificationError(status - 2);
@@ -246,23 +255,26 @@ void ProgramDevice(void)
   if (gProgramProtection)
   {
     printf("done\nProgramming sector protection...");
-    if(ProgramProtectionSettings() != SUCCESS) 
+    status = ProgramProtectionSettings();
+    if (status != SUCCESS)
     {
-      printf("error.\n");
+      printf("error code %d.\n", status);
       return;
     }
     printf("done\nVerifying sector protection...");
-    if(VerifyProtectionSettings() != SUCCESS)
+    status = VerifyProtectionSettings();
+    if (status != SUCCESS)
     {
-      printf("error.\n");
+      printf("error code %d.\n", status);
       return;
     }
   }
 
   printf("done\nVerifying final checksum...");
-  if(VerifyChecksum() != SUCCESS) 
+  status = VerifyChecksum();
+  if (status != SUCCESS) 
   {
-    printf("error.\n");
+    printf("error code %d.\n", status);
     return;
   }
 
@@ -271,7 +283,7 @@ void ProgramDevice(void)
 
 void printUsage()
 {
-    printf("Usage: swd_prog [-y] [-yp] <hex file name>\n");
+    printf("Usage: swd_prog [-y] [-yp] [-16] <hex file name>\n");
     printf("    by default it would perform only verification of the flash content.\n\n");
     printf("    specify -y to perform programming of the flash (WARNING: this \n"
            "    operation will erase all flash content, existing programming would be\n"
@@ -280,7 +292,8 @@ void printUsage()
            "    protection is off and anyone can read the flash content. You can set \n"
            "    flash protection bits, to secure some or all content. Use with caution\n"
            "    as you may render the SWD port unusable if you set the 'KILL' bit by \n"
-           "    mistake.\n");
+           "    mistake.\n\n");
+    printf("    specify -16 to program a device with 16KB flash. Default is 32KB flash.\n");
 }
 
 int main(int argc, char* argv[])
@@ -312,7 +325,11 @@ int main(int argc, char* argv[])
           return 2;
         }
       }
-      else
+      else if (argv[idx][1] == '1')
+      {
+        gProg16k = true;
+      }
+      else 
       {
         printf("Unknow argument %s\n", argv[idx]);
         printUsage();
