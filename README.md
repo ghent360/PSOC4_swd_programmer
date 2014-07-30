@@ -8,7 +8,8 @@ To build the programmer you would need a basic FX2LP device. One from amazon or 
 Connct:
 ```
     FX2LP       PSoc 4
-    Device ---> Target
+    Device      Target
+    ------      ---------------
     PD0    ---> SWDIO
     PD1    ---> SWDCL
     PB2    ---> XRES (or RESET)
