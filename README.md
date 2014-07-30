@@ -1,7 +1,7 @@
 PSOC4_swd_programmer
 ====================
 
-SWD Programmer for PSoc 4 based devices.
+##SWD Programmer for PSoc 4 based devices.
 
 To build the programmer you would need a basic FX2LP device. One from amazon or ebay based on CY7C68013A would do. Install the FX2LP SDK from Cypress and flash swd.iic from the FX2LP folder on the FX2LP device.
 
@@ -21,8 +21,8 @@ This will power the target as 3.3V from the FX2LP board. Pleas make sure there i
 Use the PC software to flash a .hex file to the target.
 
 Limitations:
-  -- only tested on PSoc 4100 and 4200 (I don't have 4000 device)
-  -- only tested on 32K flash device (16K devices should work but YMMV).
+- only tested on PSoc 4100 and 4200 (I don't have 4000 device)
+- only tested on 32K flash device (16K devices should work but YMMV).
 
 Building the software:
 
