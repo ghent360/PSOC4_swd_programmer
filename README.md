@@ -1,13 +1,13 @@
 PSOC4_swd_programmer
 ====================
 
-SWD Programmer for PSoc4 based devices.
+SWD Programmer for PSoc 4 based devices.
 
 To build the programmer you would need a basic FX2LP device. One from amazon or ebay based on CY7C68013A would do. Install the FX2LP SDK from Cypress and flash swd.iic from the FX2LP folder on the FX2LP device.
 
 Connct:
 ```
-    FX2LP
+    FX2LP       PSoc 4
     Device ---> Target
     PD0    ---> SWDIO
     PD1    ---> SWDCL
