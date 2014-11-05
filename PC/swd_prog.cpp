@@ -314,7 +314,7 @@ int main(int argc, char* argv[])
         {
           gProgram = true;
         }
-        else if (argv[idx][3] == 'p')
+        else if (argv[idx][2] == 'p')
         {
           gProgramProtection = true;
         }
