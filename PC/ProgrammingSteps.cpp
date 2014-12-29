@@ -579,7 +579,6 @@ unsigned char EraseAllFlash(void)
       return 5;
     }
   }
-
   /* If the transition is from protected mode to open mode or protected mode to
   protected mode only, call ERASE_ALL SROM command */
   else if (flow == PROT_XXX)
@@ -1080,6 +1079,51 @@ unsigned char VerifyChecksum(void)
 unsigned char ReadHsspErrorStatus()
 {
   return(gSWD_PacketAck);
+}
+
+/*
+* Read the content of the flas. The buffer must be large enough to hold the
+* whole device flash content (16K or 32k).
+*/
+unsigned char ReadFlash(unsigned char* buffer)
+{ 
+  unsigned long  flashData 		= 0;    
+  unsigned short numOfFlashRows 	= 0;
+  unsigned short rowAddress 		= 0;
+  unsigned short rowCount;
+  unsigned char  i;
+
+  /* Get the total number of flash rows in the Target PSoC 4 device */
+  numOfFlashRows   = GetFlashRowCount();
+
+  /* Read and Verify Flash rows */
+  for ( rowCount = 0; rowCount < numOfFlashRows; rowCount++)
+  {
+    /* Read row from hex file */
+
+    /* linear address of row in flash */
+    rowAddress = FLASH_ROW_BYTE_SIZE_HEX_FILE * rowCount;
+
+    /* Read row from chip */
+    for (i = 0; i < FLASH_ROW_BYTE_SIZE_HEX_FILE; i += 4)
+    {
+      /* Read flash via AHB-interface */
+      Read_IO( rowAddress + i, &flashData);
+      if( gSWD_PacketAck != SWD_OK_ACK )
+      {
+        printf("Failed to read row %d\n", rowCount);
+        break;
+      }
+
+      chipData[i + 0] = (flashData >> 0) & 0xFF;
+      chipData[i + 1] = (flashData >> 8) & 0xFF;
+      chipData[i + 2] = (flashData >> 16) & 0xFF;
+      chipData[i + 3] = (flashData >> 24) & 0xFF;
+    }
+    memcpy(buffer, chipData, i);
+    buffer += FLASH_ROW_BYTE_SIZE_HEX_FILE;
+  }
+  return SUCCESS;
 }
 
 /* [] END OF FILE */

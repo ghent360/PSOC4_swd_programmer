@@ -138,6 +138,7 @@ unsigned char ReadSromStatus(void);
 unsigned char PollSromStatus(void);
 unsigned long GetSiliconId();
 void PrintFlashVerificationError(int i);
+unsigned char ReadFlash(unsigned char* buffer);
 
 #endif /* __PROGRAMMINGSTEPS_H */
 

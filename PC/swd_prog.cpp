@@ -20,6 +20,7 @@ static HexFileParser gHexParser;
 static bool gProgram = false;
 static bool gProgramProtection = false;
 static bool gProg16k = false;
+static bool gRead = false;
 
 static BYTE RM_FetchStatus()
 {
@@ -281,19 +282,53 @@ void ProgramDevice(void)
   printf("done\nSUCCESS\n");
 }
 
+void ReadDevice(const char* fileName)
+{
+    static unsigned char buffer[32768];
+    unsigned char status;
+    size_t flashSize = sizeof(buffer);
+    FILE* output = fopen(fileName, "wb");
+    if (NULL == output)
+    {
+      printf("Can not open %s for writing.\n", fileName);
+      return;
+    }
+
+    printf("Acquring device...");
+    status = DeviceAcquire();
+    if (status != SUCCESS)
+    {
+      printf("error code %d.\n", status);
+      fclose(output);
+      return;
+    }
+    printf("done\nReading Flash...");
+    ReadFlash(buffer);
+    printf("done\n");
+    if (gProg16k)
+    {
+      flashSize = 16*1024;
+    }
+    fwrite(buffer, 1, flashSize, output);
+    fclose(output);
+}
+
 void printUsage()
 {
-    printf("Usage: swd_prog [-y] [-yp] [-16] <hex file name>\n");
+    printf("Usage: swd_prog [-r] [-y] [-yp] [-16] <file name>\n");
     printf("    by default it would perform only verification of the flash content.\n\n");
     printf("    specify -y to perform programming of the flash (WARNING: this \n"
            "    operation will erase all flash content, existing programming would be\n"
            "    lost)\n\n");
-    printf("    add -yy to program the flash security settings. By default all flash \n"
+    printf("    add -yp to program the flash security settings. By default all flash \n"
            "    protection is off and anyone can read the flash content. You can set \n"
            "    flash protection bits, to secure some or all content. Use with caution\n"
            "    as you may render the SWD port unusable if you set the 'KILL' bit by \n"
            "    mistake.\n\n");
-    printf("    specify -16 to program a device with 16KB flash. Default is 32KB flash.\n");
+    printf("    specify -16 to program a device with 16KB flash. Default is 32KB flash.\n\n");
+    printf("    specify -r to read teh flash content and write it to a binary file. This will\n");
+    printf("    not read devices that have beed switched to protected mode. The flash content\n");
+    printf("    would be all 0s\n");
 }
 
 int main(int argc, char* argv[])
@@ -329,6 +364,10 @@ int main(int argc, char* argv[])
       {
         gProg16k = true;
       }
+      else if (argv[idx][1] == 'r')
+      {
+        gRead = true;
+      }
       else 
       {
         printf("Unknow argument %s\n", argv[idx]);
@@ -343,21 +382,30 @@ int main(int argc, char* argv[])
   }
   if (fileIdx < 0)
   {
-    printf("Please specify input file name.\n");
+    printf("Please specify file name.\n");
     printUsage();
     return 2;
-  }
-  if (!gHexParser.parse(argv[fileIdx]))
-  {
-    printf("Error persing the input file: %s.\n", argv[fileIdx]);
-    return -1;
   }
 
   if (!gUSBDevice.IsOpen()) {
     printf("Can't connect to the FX2LP USB device. Check the USB cable.\n");
     return -1;
   }
-  ProgramDevice();
+  if (gRead)
+  {
+    ReadDevice(argv[fileIdx]);
+  }
+  else
+  {
+    if (!gHexParser.parse(argv[fileIdx]))
+    {
+      printf("Error persing the input file: %s.\n", argv[fileIdx]);
+    }
+    else
+    {
+      ProgramDevice();
+    }
+  }
   ExitProgrammingMode();
   gUSBDevice.Close();
 	return 0;
