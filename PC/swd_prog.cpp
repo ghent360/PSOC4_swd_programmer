@@ -321,19 +321,19 @@ void printUsage()
            "    operation will erase all flash content, existing programming would be\n"
            "    lost)\n\n");
     printf("    add -yp to program the flash security settings. By default all flash \n"
-           "    protection is off and anyone can read the flash content. You can set \n"
+           "    protection is off and the software can write the flash content. You can set \n"
            "    flash protection bits, to secure some or all content. Use with caution\n"
            "    as you may render the SWD port unusable if you set the 'KILL' bit by \n"
            "    mistake.\n\n");
     printf("    specify -16 to program a device with 16KB flash. Default is 32KB flash.\n\n");
-    printf("    specify -r to read teh flash content and write it to a binary file. This will\n");
-    printf("    not read devices that have beed switched to protected mode. The flash content\n");
-    printf("    would be all 0s\n");
+    printf("    specify -r to read the flash content and write it to a binary file. If the \n");
+    printf("    device has been switched to protected mode the flash content would be all 0s\n");
 }
 
 int main(int argc, char* argv[])
 {
   int fileIdx = -1;
+  const char* serial = NULL;
   if (argc < 2)
   {
     printUsage();
@@ -367,6 +367,11 @@ int main(int argc, char* argv[])
       else if (argv[idx][1] == 'r')
       {
         gRead = true;
+      }
+      else if (argv[idx][1] == 's')
+      {
+        serial = argv[idx+1];
+        idx++;
       }
       else 
       {
@@ -403,6 +408,13 @@ int main(int argc, char* argv[])
     }
     else
     {
+      if (serial)
+      {
+        if (!gHexParser.updateSerial(serial))
+        {
+          printf("Can not locate serial number placeholder in the input file\n");
+        }
+      }
       ProgramDevice();
     }
   }

@@ -11,6 +11,7 @@ public:
 
   bool parse(std::string fileName);
   unsigned int getDataFrom(unsigned int startAddr, unsigned int maxLen, void* pBuffer);
+  bool updateSerial(const char* serial);
 
 private:
   struct Record

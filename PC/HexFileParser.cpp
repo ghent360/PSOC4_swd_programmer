@@ -194,3 +194,55 @@ unsigned int HexFileParser::getDataFrom(unsigned int startAddr, unsigned int max
   }
   return result;
 }
+
+static unsigned int checksum(const unsigned char* data, size_t len)
+{
+  unsigned int result = 0;
+  while (len)
+  {
+    result += *data++;
+    len--;
+  }
+  return result;
+}
+
+bool HexFileParser::updateSerial(const char* serial)
+{
+  std::list<Record>::iterator it;
+  std::list<Record>::iterator cksum;
+  unsigned int crc;
+  for(it = content_.begin(); it != content_.end(); ++it)
+  {
+    if (it->adress_ == 0x90300000 && it->size_ == 2)
+    {
+      cksum = it;
+      break;
+    }
+  }
+  if (cksum != it)
+  {
+    return false;
+  }
+  crc = (cksum->data_[0] << 8) | cksum->data_[1];
+  for(it = content_.begin(); it != content_.end(); ++it)
+  {
+    if (it->size_ != 0x40) continue;
+    if (it->data_[0] != 'S' ||
+        it->data_[1] != '$' ||
+        it->data_[2] != 'N' ||
+        it->data_[3] != '&') continue;
+    crc -= checksum(it->data_, it->size_);
+    size_t len = strlen(serial);
+    if (len > 0x39)
+    {
+      len = 0x39;
+    }
+    memcpy(it->data_, serial, len);
+    it->data_[len] = 0;
+    crc += checksum(it->data_, it->size_);
+    cksum->data_[0] = crc >> 8;
+    cksum->data_[1] = crc & 0xff;
+    return true;
+  }
+  return false;
+}
