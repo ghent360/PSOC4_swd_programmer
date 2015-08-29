@@ -235,17 +235,20 @@ StringDscr1End:
 StringDscr2:   
       db   StringDscr2End-StringDscr2      ;; Descriptor length
       db   DSCR_STRING
+      db   'P',00
+      db   'S',00
+      db   'O',00
+      db   'C',00
+      db   '4',00
+      db   '_',00
+      db   'S',00
+      db   'W',00
       db   'D',00
-      db   'A',00
-      db   'L',00
-      db   'E',00
-      db   'D',00
-      db   'A',00
-      db   '-',00
-      db   'D',00
-      db   'L',00
-      db   'U',00
-      db   '2',00
+      db   '_',00
+      db   'P',00
+      db   'R',00
+      db   'O',00
+      db   'G',00
 StringDscr2End:
 
 UserDscr:      
