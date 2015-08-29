@@ -45,6 +45,9 @@
     <ClInclude Include="HexFileParser.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="DeviceFunctions.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="stdafx.cpp">
@@ -56,10 +59,10 @@
     <ClCompile Include="ProgrammingSteps.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="HexImage.cpp">
+    <ClCompile Include="HexFileParser.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="HexFileParser.cpp">
+    <ClCompile Include="Windows.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
