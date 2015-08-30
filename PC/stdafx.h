@@ -8,7 +8,7 @@
 #include "targetver.h"
 
 #include <stdio.h>
-#ifdef WINDOWS
+#ifdef WIN32
 #include <tchar.h>
 #include <Windows.h>
 #include "CyAPI.h"
