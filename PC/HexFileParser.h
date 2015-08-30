@@ -9,7 +9,7 @@ public:
   HexFileParser();
   ~HexFileParser(void);
 
-  bool parse(std::string fileName);
+  bool parse(const std::string& fileName);
   unsigned int getDataFrom(unsigned int startAddr, unsigned int maxLen, void* pBuffer);
   bool updateSerial(const char* serial);
 
@@ -26,7 +26,7 @@ private:
   unsigned char parseHexByte(const std::string& line, int idx);
   unsigned int  parseHexWord(const std::string& line, int idx);
   void clean();
-  static bool HexFileParser::compareAddress(const Record& first, const Record& second);
+  static bool compareAddress(const Record& first, const Record& second);
 
   unsigned int baseAddress_;
   std::list<Record> content_;

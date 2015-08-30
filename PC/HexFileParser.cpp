@@ -1,11 +1,11 @@
-#include "StdAfx.h"
+#include "stdafx.h"
 #include "HexFileParser.h"
 
 #include <algorithm>
 #include <fstream>
 #include <iostream>
 
-HexFileParser::HexFileParser()
+HexFileParser::HexFileParser() : baseAddress_(0)
 {
 }
 
@@ -26,9 +26,10 @@ void HexFileParser::clean()
   content_.clear();
 }
 
-bool HexFileParser::parse(std::string fileName)
+bool HexFileParser::parse(const std::string& fileName)
 {
-  std::ifstream hexFileInput(fileName);
+  std::ifstream hexFileInput;
+  hexFileInput.open(fileName.c_str());
   if (!hexFileInput.good())
   {
     std::cout << "Error opening input file: " << fileName << std::endl;

@@ -100,7 +100,7 @@ void ProgramDevice(void)
     unsigned long hexSiliconId;
     printf("error code %d.\n", status);
     HEX_ReadSiliconId(&hexSiliconId);
-    printf("Device reports silicon ID:%08x, but the file was compiled for %08x\n",
+    printf("Device reports silicon ID:%08lx, but the file was compiled for %08lx\n",
       GetSiliconId(), hexSiliconId);
     return;
   }

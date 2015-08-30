@@ -8,8 +8,14 @@
 #include "targetver.h"
 
 #include <stdio.h>
+#ifdef WINDOWS
 #include <tchar.h>
 #include <Windows.h>
 #include "CyAPI.h"
 #include "cyioctl.h"
+#else
+#include <string.h>
+typedef unsigned char BYTE;
+typedef unsigned int DWORD;
+#endif
 #include "HexFileParser.h"
